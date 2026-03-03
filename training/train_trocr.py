@@ -70,14 +70,13 @@ class KaithiDataset(Dataset):
             images=image, return_tensors="pt"
         ).pixel_values.squeeze(0)
 
-        with self.processor.tokenizer.as_target_tokenizer():
-            labels = self.processor.tokenizer(
-                label,
-                padding="max_length",
-                max_length=self.max_len,
-                truncation=True,
-                return_tensors="pt",
-            ).input_ids.squeeze(0)
+        labels = self.processor.tokenizer(
+            text_target=label,
+            padding="max_length",
+            max_length=self.max_len,
+            truncation=True,
+            return_tensors="pt",
+        ).input_ids.squeeze(0)
 
         # Replace pad token id with -100 so it's ignored in loss
         labels[labels == self.processor.tokenizer.pad_token_id] = -100
@@ -186,7 +185,7 @@ def train(
 
     trainer = Seq2SeqTrainer(
         model=model,
-        processing_class=processor.image_processor,
+        processing_class=processor.tokenizer,
         args=training_args,
         compute_metrics=make_compute_metrics(processor) if EVAL_OK else None,
         train_dataset=train_ds,
