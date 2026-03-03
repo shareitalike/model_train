@@ -1,0 +1,149 @@
+# GCP Free Tier Runbook: Kaithi OCR System ☁️
+
+This runbook guides you through deploying and training the Kaithi OCR system using Google Cloud Platform's "Always Free" tier.
+
+> [!CAUTION]
+> **The GCP "Always Free" tier provides a `e2-micro` instance (2 vCPUs, 1GB RAM) and NO GPUs.**  
+> The OCR system requires a minimum of 16GB RAM and ideally a GPU for training. 
+> You CANNOT train or run this specific application effectively on the "Always Free" tier without severe performance issues or out-of-memory crashes.
+
+However, you *can* use the **$300 Free Trial Credit** (valid for 90 days) to spin up a powerful machine, train the model, and then shut it down before you are ever billed.
+
+Below is the runbook using the **$300 Free Trial Credit**.
+
+---
+
+## Part 1: Initial Setup (Using $300 Free Credit)
+
+### Step 1: Create the GCP Project
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Sign up for the $300 Free Trial (requires a credit card, but won't auto-charge unless you manually upgrade).
+3. Create a new Project (e.g., `kaithi-ocr-project`).
+
+### Step 2: Request GPU Quota (Crucial)
+New GCP accounts have a GPU quota of 0. You must request an increase.
+1. Navigate to **IAM & Admin > Quotas**.
+2. Search for `GPUs (all regions)`.
+3. Select it and click **Edit Quotas**.
+4. Request `1` GPU. 
+5. Also search for `NVIDIA T4 GPUs` (or whichever GPU you prefer) for your specific region (e.g., `us-central1`) and request `1`.
+6. Add a justification: *"Requires GPU for fine-tuning an open-source OCR model via Hugging Face."*
+ *(Note: Approval takes 24-48 hours. If denied, you must train on CPU using a high-RAM instance.)*
+
+---
+
+## Part 3: VM Creation & Configuration
+
+### Step 1: Create the Virtual Machine
+1. Go to **Compute Engine > VM Instances > Create Instance**.
+2. **Name:** `kaithi-ocr-trainer`
+3. **Region:** `us-central1` (often has the best hardware availability).
+4. **Machine Configuration:** 
+   - *If GPU Quota Approved:* Select **GPU**, then `NVIDIA T4` (1 GPU). Select `n1-standard-4` (4 vCPUs, 15GB RAM).
+   - *If Training on CPU:* Select **General-purpose**, then `e2-standard-8` (8 vCPUs, 32GB RAM).
+5. **Boot Disk:** Click **Change**.
+   - Operating System: `Ubuntu`
+   - Version: `Ubuntu 22.04 LTS`
+   - Boot disk type: `SSD persistent disk`
+   - Size: `100 GB` (Generating 10k images requires significant space).
+6. **Firewall:** Check "Allow HTTP traffic" and "Allow HTTPS traffic".
+7. Click **Create**.
+
+### Step 2: Connect and Install Dependencies
+Once the VM is running, click the **SSH** button next to it in the console.
+
+Run the following commands to install Docker and Git:
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+
+# Install Docker Compose
+sudo apt-get install docker-compose-plugin -y
+
+# (IF you have a GPU) Install NVIDIA Drivers & Container Toolkit
+# Follow GCP's official docs for installing NVIDIA drivers on Ubuntu:
+# https://cloud.google.com/compute/docs/gpus/install-drivers-gpu
+```
+*Note: After running these, type `exit`, then click the SSH button again to log back in so the Docker permissions apply.*
+
+---
+
+## Part 4: Project Execution
+
+### Step 1: Clone the Code
+```bash
+git clone https://github.com/your-org/kaithi-ocr.git
+cd kaithi-ocr
+cp backend/.env.example backend/.env
+```
+
+### Step 2: Start the System (CPU vs GPU)
+If you are using the CPU machine:
+```bash
+make up
+```
+
+If you successfully installed the NVIDIA drivers and have a GPU:
+```bash
+make prod-gpu
+```
+
+### Step 3: Run the Training Pipeline
+Generate the dataset (Takes time and disk space):
+```bash
+make synth-data
+```
+
+Start the training:
+*If using a 16GB GPU (like a T4), the default command usually works:*
+```bash
+make train
+```
+
+*If using a CPU (this will take days):*
+```bash
+# We use nohup so the training continues even if your SSH session closes
+nohup docker compose exec -T backend python training/train_trocr.py \
+    --dataset_path ./kaithi_dataset/hf_dataset \
+    --output_dir   /app/models/kaithi-trocr-v1 \
+    --epochs       30 \
+    --batch_size   8 \
+    --grad_accum   1 > training.log 2>&1 &
+```
+*To check CPU training progress, type: `tail -f training.log`*
+
+### Step 4: Download Your Finished Model
+Once training is complete, the model weights will be in `./models/kaithi-trocr-v1/`.
+Zip them up and download them to your local Windows machine using the "Download File" option in the GCP SSH window (top right gear icon).
+```bash
+zip -r my_trained_model.zip ./models/kaithi-trocr-v1/
+```
+
+---
+
+## 🛑 Pitfalls and Cost Warnings
+
+You MUST be aware of the following to avoid losing your $300 credit or getting charged:
+
+### 1. The "Always Free" Tier Trap
+The "Always Free" `e2-micro` instance (2 vCPU limits, 1GB RAM) **will instantly crash** when trying to run `docker compose up` for this project. PostgreSQL, Redis, Celery, and the FastAPI app cannot fit into 1GB of RAM. You must use the $300 credit on a larger machine.
+
+### 2. Idle Machines Drain Credits
+If you leave an `n1-standard-4` with a T4 GPU running 24/7 without doing anything, it costs roughly `$250-$300/month`. **Your credits will vanish.**
+**Solution:** The moment your training is done and you have downloaded the `.zip` file containing your model, go to the Compute Engine console and click **STOP** on the VM. It only costs pennies when stopped (just for the 100GB disk).
+
+### 3. GPU Quota Denials
+Google frequently denies GPU requests for brand-new Free Trial accounts to prevent cryptocurrency mining abuse. 
+**Solution:** If denied, you must fall back to the 32GB RAM CPU machine (`e2-standard-8`). It will cost about `$190/month` running 24/7, meaning your $300 credit covers ~1.5 months of continuous CPU training.
+
+### 4. Ephemeral Storage Loss
+If you delete the VM instance, the 100GB disk attached to it is deleted too. Make sure you use the SSH `Download File` feature to get your trained model onto your local Windows machine before terminating the project.
+
+### 5. SSH Disconnects
+If you are pulling synthetic data or training on a CPU and your laptop goes to sleep, your SSH connection will break, and the training script might abort. 
+**Solution:** Use the `nohup` command shown in Step 3, or install `tmux` (`sudo apt install tmux`), which keeps terminal sessions alive in the background.

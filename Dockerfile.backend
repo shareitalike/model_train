@@ -1,0 +1,42 @@
+FROM python:3.11-slim
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 \
+    libgl1-mesa-glx libglib2.0-dev \
+    fonts-noto curl wget git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python deps
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir torch==2.3.0+cpu torchvision==0.18.0+cpu \
+        -f https://download.pytorch.org/whl/torch_stable.html && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Create directories
+RUN mkdir -p /app/logs /app/fonts /app/models
+
+# Download Noto Sans Devanagari fonts
+RUN wget -q -O /app/fonts/NotoSansDevanagari-Regular.ttf \
+    "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf" || \
+    cp /usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf /app/fonts/ 2>/dev/null || true
+
+RUN wget -q -O /app/fonts/NotoSansDevanagari-Bold.ttf \
+    "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Bold.ttf" || \
+    cp /usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf /app/fonts/ 2>/dev/null || true
+
+# Copy backend source
+COPY backend/ .
+
+# Non-root user
+RUN useradd -m -u 1000 kaithi && chown -R kaithi:kaithi /app
+USER kaithi
+
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--timeout-keep-alive", "75"]

@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Node / React
+node_modules/
+frontend/build/
+.npm/
+
+# Env & secrets
+.env
+backend/.env
+*.secret
+*.key
+
+# Data & models
+kaithi_dataset/
+models/kaithi-trocr-v1/
+models/kaithi-trocr-finetuned/
+*.safetensors
+*.bin
+
+# Logs
+*.log
+logs/
+backend/logs/
+
+# Docker
+docker/ssl/*.pem
+docker/ssl/*.crt
+docker/ssl/*.key
+
+# Backups
+backups/*.sql.gz
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp

@@ -1,0 +1,119 @@
+# Final Runbook: Kaithi OCR System (End-to-End) 🚀
+
+This is your master guide for zero-to-hero deployment and training of the Kaithi OCR model on Google Cloud Platform, using Terraform to ensure you maximize your $300 Free Trial while avoiding unexpected charges.
+
+---
+
+## Part 1: Prerequisites & Cloud Authentication
+
+1. **Get the $300 GCP Credit:** Sign up for Google Cloud and activate the $300 Free Trial.
+2. **Install Tools (on your Local Windows PC):**
+   *   [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
+   *   [Terraform](https://developer.hashicorp.com/terraform/downloads)
+3. **Login to GCP:**
+   Open your Windows command prompt/PowerShell and type:
+   ```bash
+   gcloud auth application-default login
+   ```
+   *Follow the browser prompts to log in.*
+
+---
+
+## Part 2: Terraform Infrastructure Deployment
+
+1. **Create the Files:** On your local PC, create a folder named `kaithi_gcp` and copy the `main.tf` and `variables.tf` files from our earlier conversation into it.
+2. **Deploy the GPU Machine:**
+   Open a terminal in that `kaithi_gcp` folder and run:
+   ```bash
+   terraform init
+   
+   # Replace with your actual GCP Project ID (found in the console top-left menu)
+   terraform apply -var="project_id=YOUR_PROJECT_ID"
+   ```
+   *Type `yes` when prompted. Wait 2-3 minutes for the `kaithi-ocr-trainer` VM to spin up.*
+
+---
+
+## Part 3: VM Setup & Dependency Installation
+
+1. **Connect to the VM:** 
+   Go to the [GCP Compute Engine Console](https://console.cloud.google.com/compute) and click the `SSH` button next to `kaithi-ocr-trainer`.
+2. **Install NVIDIA Drivers (Crucial for the GPU):**
+   In the SSH window, run the official Google auto-installer:
+   ```bash
+   sudo /opt/deeplearning/install-driver.sh
+   # (If the script above doesn't exist, search "GCP install NVIDIA drivers Ubuntu 22.04" for the latest commands)
+   ```
+3. **Verify the GPU:**
+   ```bash
+   nvidia-smi
+   ```
+   *If you see the T4 GPU listed, you are ready to train!*
+
+---
+
+## Part 4: Project Code & Training
+
+Still inside the GCP SSH window:
+
+1. **Clone the Project:**
+   ```bash
+   git clone https://github.com/your-org/kaithi-ocr.git
+   cd kaithi-ocr
+   cp backend/.env.example backend/.env
+   ```
+
+2. **Start the Environment:**
+   *(Ensure Docker is installed via the `main.tf` startup script)*
+   ```bash
+   # Add your user to the docker group if you get permission errors:
+   # sudo usermod -aG docker $USER && newgrp docker
+   
+   make prod-gpu
+   ```
+
+3. **Generate Synthetic Training Data:**
+   *(This creates 10,000 images and takes a while).*
+   ```bash
+   make synth-data
+   ```
+
+4. **Train the Model:**
+   ```bash
+   make train
+   ```
+   *(Training on the T4 will take a few hours. Do not close the SSH window!)*
+
+---
+
+## Part 5: Model Extraction & Shutdown (⚠️ CRITICAL)
+
+1. **Zip the Finished Model:**
+   Once `make train` finishes, zip the trained model folder:
+   ```bash
+   zip -r my_trained_model.zip ./models/kaithi-trocr-v1/
+   ```
+
+2. **Download it to Windows:**
+   Click the gear icon (⚙️) in the top-right of your GCP SSH window, select **"Download File"**, and type the path: 
+   `/home/YOUR_USERNAME/kaithi-ocr/my_trained_model.zip`
+   *(Wait for the download to finish).*
+
+3. **DESTROY THE INFRASTRUCTURE TO STOP BILLING:**
+   Finally, go back to your local Windows command prompt where you ran Terraform, and type:
+   ```bash
+   terraform destroy -var="project_id=YOUR_PROJECT_ID"
+   ```
+   *Type `yes` when prompted. This deletes the VM, the 100GB disk, and the IP address—stopping all costs instantly.*
+
+---
+
+## Part 6: Running Locally (Free Forever)
+
+1. Unzip `my_trained_model.zip` on your local PC.
+2. Put those files into the `/models/kaithi-trocr-v1/` directory of your local Kaithi OCR project folder.
+3. Open your project on Windows and run:
+   ```bash
+   make up
+   ```
+You now have a fully trained Kaithi OCR system running locally for free!
