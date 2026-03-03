@@ -45,3 +45,9 @@ backups/*.sql.gz
 .DS_Store
 Thumbs.db
 *.swp
+
+# Terraform files
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup

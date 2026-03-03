@@ -115,35 +115,46 @@ variable "zone" {
 
 ---
 
-## 🚀 How to Execute Safely
+## 🚀 How to Execute Safely (Fully Automated)
+
+Because this process is fully automated, the VM will install its own drivers, train the model, upload the results, and **delete itself** to prevent idle billing.
 
 1. **Authenticate Terraform with GCP:**
    ```bash
    gcloud auth application-default login
    ```
 
-2. **Initialize Terraform:**
+2. **Navigate to the Terraform Directory:**
+   ```bash
+   cd terraform
+   ```
+
+3. **Initialize Terraform:**
    ```bash
    terraform init
    ```
 
-3. **Plan the Deployment:**
-   Replace `<YOUR_PROJECT_ID>` with your actual GCP Project ID.
+4. **Deploy the Automated Pipeline:**
+   Replace `<YOUR_PROJECT_ID>` with your GCP Project ID, and `<UNIQUE_BUCKET_NAME>` with a globally unique name (e.g., `kaithi-models-yourname-123`).
    ```bash
-   terraform plan -var="project_id=<YOUR_PROJECT_ID>"
+   terraform apply -var="project_id=<YOUR_PROJECT_ID>" -var="bucket_name=<UNIQUE_BUCKET_NAME>"
    ```
-   *Review the output. It should show 2 resources to add (the VM and Firewall rule).*
+   *Type `yes` when prompted.*
 
-4. **Deploy the Machine:**
+5. **Wait and Relax:**
+   The VM will boot, install NVIDIA drivers, clone this repository, run `make synth-data`, and `make train`.
+   This process takes several hours.
+   If you want to monitor the progress, you can SSH into the machine via the GCP Console and run:
    ```bash
-   terraform apply -var="project_id=<YOUR_PROJECT_ID>"
+   tail -f /var/log/startup-script.log
    ```
 
-5. **Train Your Model:**
-   SSH into the machine via the GCP console, run your `make synth-data` and `make train`, and download your trained model `.zip` file.
+6. **Download Your Model:**
+   Once the training is complete, the VM will automatically zip the model, upload it to your GCP Storage Bucket (`gs://<UNIQUE_BUCKET_NAME>`), and then **delete itself**.
+   Go to the [GCP Cloud Storage Console](https://console.cloud.google.com/storage) to download `my_trained_model.zip`.
 
-6. **🛑 CRITICAL SHUTDOWN STEP:**
-   The moment you have downloaded your model weights, destroy the infrastructure to stop all billing immediately.
+7. **Clean up the Bucket/Firewall (Optional):**
+   The VM deletes itself, stopping the expensive GPU billing. The only remaining costs are pennies per month for the Storage Bucket. To completely remove everything:
    ```bash
-   terraform destroy -var="project_id=<YOUR_PROJECT_ID>"
+   terraform destroy -var="project_id=<YOUR_PROJECT_ID>" -var="bucket_name=<UNIQUE_BUCKET_NAME>"
    ```

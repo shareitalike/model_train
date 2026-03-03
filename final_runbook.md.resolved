@@ -19,92 +19,52 @@ This is your master guide for zero-to-hero deployment and training of the Kaithi
 
 ---
 
-## Part 2: Terraform Infrastructure Deployment
+## Part 2: Terraform Infrastructure Deployment (Fully Automated)
 
-1. **Create the Files:** On your local PC, create a folder named `kaithi_gcp` and copy the `main.tf` and `variables.tf` files from our earlier conversation into it.
-2. **Deploy the GPU Machine:**
-   Open a terminal in that `kaithi_gcp` folder and run:
+1. **Verify Terraform Files:** Ensure your local `kaithi-ocr/terraform` directory contains `main.tf`, `variables.tf`, and `outputs.tf`.
+2. **Deploy the Automated Pipeline:**
+   Open a terminal in the `terraform` folder and run:
    ```bash
    terraform init
    
-   # Replace with your actual GCP Project ID (found in the console top-left menu)
-   terraform apply -var="project_id=YOUR_PROJECT_ID"
+   # Replace with your actual GCP Project ID and a globally unique Bucket Name
+   terraform apply -var="project_id=YOUR_PROJECT_ID" -var="bucket_name=kaithi-models-YOURNAME"
    ```
-   *Type `yes` when prompted. Wait 2-3 minutes for the `kaithi-ocr-trainer` VM to spin up.*
+   *Type `yes` when prompted. Wait a few minutes for the `kaithi-ocr-trainer` VM to spin up.*
 
 ---
 
-## Part 3: VM Setup & Dependency Installation
+## Part 3: Wait for Automated Training
 
-1. **Connect to the VM:** 
-   Go to the [GCP Compute Engine Console](https://console.cloud.google.com/compute) and click the `SSH` button next to `kaithi-ocr-trainer`.
-2. **Install NVIDIA Drivers (Crucial for the GPU):**
-   In the SSH window, run the official Google auto-installer:
-   ```bash
-   sudo /opt/deeplearning/install-driver.sh
-   # (If the script above doesn't exist, search "GCP install NVIDIA drivers Ubuntu 22.04" for the latest commands)
-   ```
-3. **Verify the GPU:**
-   ```bash
-   nvidia-smi
-   ```
-   *If you see the T4 GPU listed, you are ready to train!*
+**This is a fully "hands-off" process.** The VM will automatically:
+1. Install NVIDIA drivers.
+2. Clone this repository.
+3. Generate synthetic data (`make synth-data`).
+4. Train the model (`make train`).
+5. Zip the model to `my_trained_model.zip`.
+6. Upload the zip file into your Google Cloud Storage Bucket.
+7. **Delete itself** to stop all compute and GPU billing.
 
----
-
-## Part 4: Project Code & Training
-
-Still inside the GCP SSH window:
-
-1. **Clone the Project:**
-   ```bash
-   git clone https://github.com/your-org/kaithi-ocr.git
-   cd kaithi-ocr
-   cp backend/.env.example backend/.env
-   ```
-
-2. **Start the Environment:**
-   *(Ensure Docker is installed via the `main.tf` startup script)*
-   ```bash
-   # Add your user to the docker group if you get permission errors:
-   # sudo usermod -aG docker $USER && newgrp docker
-   
-   make prod-gpu
-   ```
-
-3. **Generate Synthetic Training Data:**
-   *(This creates 10,000 images and takes a while).*
-   ```bash
-   make synth-data
-   ```
-
-4. **Train the Model:**
-   ```bash
-   make train
-   ```
-   *(Training on the T4 will take a few hours. Do not close the SSH window!)*
+**This process will take several hours.** You can monitor the progress by getting the `trainer_ip` from the Terraform output, SSHing into it, and running:
+```bash
+tail -f /var/log/startup-script.log
+```
 
 ---
 
-## Part 5: Model Extraction & Shutdown (⚠️ CRITICAL)
+## Part 4: Download Model & Final Cleanup
 
-1. **Zip the Finished Model:**
-   Once `make train` finishes, zip the trained model folder:
+1. **Download the Model:**
+   Go to the [GCP Cloud Storage Console](https://console.cloud.google.com/storage).
+   Find your bucket (e.g., `kaithi-models-YOURNAME`) and download `my_trained_model.zip` to your Windows PC.
+
+2. **Clean up the Bucket and Firewall (Optional):**
+   The expensive VM has already deleted itself. The only remaining costs are a few cents for the Storage Bucket and Firewall rules. To completely remove everything from your GCP account:
+   Go back to your local Windows command prompt where you ran Terraform, and type:
    ```bash
-   zip -r my_trained_model.zip ./models/kaithi-trocr-v1/
+   terraform destroy -var="project_id=YOUR_PROJECT_ID" -var="bucket_name=kaithi-models-YOURNAME"
    ```
-
-2. **Download it to Windows:**
-   Click the gear icon (⚙️) in the top-right of your GCP SSH window, select **"Download File"**, and type the path: 
-   `/home/YOUR_USERNAME/kaithi-ocr/my_trained_model.zip`
-   *(Wait for the download to finish).*
-
-3. **DESTROY THE INFRASTRUCTURE TO STOP BILLING:**
-   Finally, go back to your local Windows command prompt where you ran Terraform, and type:
-   ```bash
-   terraform destroy -var="project_id=YOUR_PROJECT_ID"
-   ```
-   *Type `yes` when prompted. This deletes the VM, the 100GB disk, and the IP address—stopping all costs instantly.*
+   *Type `yes` when prompted.*
 
 ---
 
