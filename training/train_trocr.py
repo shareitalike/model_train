@@ -150,10 +150,15 @@ def train(
     model.config.decoder_start_token_id = processor.tokenizer.cls_token_id
     model.config.pad_token_id           = processor.tokenizer.pad_token_id
     model.config.eos_token_id           = processor.tokenizer.sep_token_id
-    model.config.max_new_tokens         = max_label_len
-    model.config.early_stopping         = True
-    model.config.num_beams              = 4
-    model.config.no_repeat_ngram_size   = 3
+    
+    # Generation parameters must go in generation_config in newer HF versions
+    model.generation_config.decoder_start_token_id = processor.tokenizer.cls_token_id
+    model.generation_config.pad_token_id           = processor.tokenizer.pad_token_id
+    model.generation_config.eos_token_id           = processor.tokenizer.sep_token_id
+    model.generation_config.max_new_tokens         = max_label_len
+    model.generation_config.early_stopping         = True
+    model.generation_config.num_beams              = 4
+    model.generation_config.no_repeat_ngram_size   = 3
 
     train_ds = KaithiDataset(train_split, processor, max_label_len)
     val_ds   = KaithiDataset(val_split,   processor, max_label_len) if val_split else None
