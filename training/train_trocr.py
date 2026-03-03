@@ -158,7 +158,7 @@ def train(
     training_args = Seq2SeqTrainingArguments(
         output_dir=output_dir,
         predict_with_generate=True,
-        evaluation_strategy="steps" if val_ds else "no",
+        eval_strategy="steps" if val_ds else "no",
         eval_steps=eval_steps,
         save_steps=save_steps,
         logging_steps=logging_steps,
