@@ -182,7 +182,7 @@ def train(
 
     trainer = Seq2SeqTrainer(
         model=model,
-        tokenizer=processor.feature_extractor,
+        tokenizer=processor.image_processor,
         args=training_args,
         compute_metrics=make_compute_metrics(processor) if EVAL_OK else None,
         train_dataset=train_ds,
