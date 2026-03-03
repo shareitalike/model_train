@@ -93,8 +93,12 @@ def make_compute_metrics(processor):
     def compute_metrics(eval_pred):
         if not EVAL_OK:
             return {}
-        logits, label_ids = eval_pred
-        pred_ids = logits.argmax(axis=-1)
+        pred_ids, label_ids = eval_pred
+        
+        # Seq2SeqTrainer with predict_with_generate returns generated token IDs directly
+        if isinstance(pred_ids, tuple):
+            pred_ids = pred_ids[0]
+            
         label_ids[label_ids == -100] = processor.tokenizer.pad_token_id
         pred_str  = processor.batch_decode(pred_ids,   skip_special_tokens=True)
         label_str = processor.batch_decode(label_ids,  skip_special_tokens=True)
