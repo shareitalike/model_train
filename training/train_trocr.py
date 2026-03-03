@@ -98,6 +98,13 @@ def make_compute_metrics(processor):
         if isinstance(pred_ids, tuple):
             pred_ids = pred_ids[0]
             
+        try:
+            import numpy as np
+            if isinstance(pred_ids, np.ndarray):
+                pred_ids[pred_ids == -100] = processor.tokenizer.pad_token_id
+        except Exception:
+            pass
+            
         label_ids[label_ids == -100] = processor.tokenizer.pad_token_id
         pred_str  = processor.batch_decode(pred_ids,   skip_special_tokens=True)
         label_str = processor.batch_decode(label_ids,  skip_special_tokens=True)
@@ -167,6 +174,7 @@ def train(
         output_dir=output_dir,
         predict_with_generate=True,
         eval_strategy="steps" if val_ds else "no",
+        save_strategy="steps" if val_ds else "no",
         eval_steps=eval_steps,
         save_steps=save_steps,
         logging_steps=logging_steps,
